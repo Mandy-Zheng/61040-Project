@@ -1,12 +1,9 @@
-import { ObjectId } from "mongodb";
+import { Router } from "./framework/router";
 
-import { Router, getExpressRouter } from "./framework/router";
-
-import { Friend, Post, User, WebSession } from "./app";
-import { PostDoc, PostOptions } from "./concepts/post";
+import { Double } from "mongodb";
+import { User, WebSession } from "./app";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
-import Responses from "./responses";
 
 class Routes {
   @Router.get("/session")
@@ -44,6 +41,13 @@ class Routes {
     return await User.delete(user);
   }
 
+  @Router.put("/users")
+  async restoreUser(session: WebSessionDoc, username: string, password: string) {
+    // const user = WebSession.getUser(session);
+    // WebSession.end(session);
+    // return await User.delete(user);
+  }
+
   @Router.post("/login")
   async logIn(session: WebSessionDoc, username: string, password: string) {
     const u = await User.authenticate(username, password);
@@ -57,85 +61,138 @@ class Routes {
     return { msg: "Logged out!" };
   }
 
-  @Router.get("/posts")
-  async getPosts(author?: string) {
-    let posts;
-    if (author) {
-      const id = (await User.getUserByUsername(author))._id;
-      posts = await Post.getByAuthor(id);
-    } else {
-      posts = await Post.getPosts({});
-    }
-    return Responses.posts(posts);
-  }
+  // @Router.get("/posts")
+  // async getPosts(author?: string) {
+  //   let posts;
+  //   if (author) {
+  //     const id = (await User.getUserByUsername(author))._id;
+  //     posts = await Post.getByAuthor(id);
+  //   } else {
+  //     posts = await Post.getPosts({});
+  //   }
+  //   return Responses.posts(posts);
+  // }
 
   @Router.post("/posts")
-  async createPost(session: WebSessionDoc, content: string, options?: PostOptions) {
-    const user = WebSession.getUser(session);
-    const created = await Post.create(user, content, options);
-    return { msg: created.msg, post: await Responses.post(created.post) };
+  async createPost(session: WebSessionDoc, content: string, audience: Set<ObjectId>, tags: Set<String>, title: string) {
+    //   const user = WebSession.getUser(session);
+    //   const created = await Post.create(user, content, options);
+    //   return { msg: created.msg, post: await Responses.post(created.post) };
+    //   When f = ExclusivePost[User, ExclusivePost].createExclusivePost(user, content, audience, tags, title)
+    // Validation[User, ExclusivePost].createValidation(res)
   }
 
-  @Router.patch("/posts/:_id")
-  async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
-    const user = WebSession.getUser(session);
-    await Post.isAuthor(user, _id);
-    return await Post.update(_id, update);
+  // @Router.patch("/posts/:_id")
+  // async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
+  //   const user = WebSession.getUser(session);
+  //   await Post.isAuthor(user, _id);
+  //   return await Post.update(_id, update);
+  // }
+
+  // @Router.delete("/posts/:_id")
+  // async deletePost(session: WebSessionDoc, _id: ObjectId) {
+  //   const user = WebSession.getUser(session);
+  //   await Post.isAuthor(user, _id);
+  //   return Post.delete(_id);
+  // }
+
+  @Router.get("/coursemap/:user")
+  async getViewableFullLessons(session: WebSessionDoc) {}
+
+  @Router.get("/coursemap/popular")
+  async getPopularCourseMap() {}
+
+  @Router.get("/post/:id/prerequisite")
+  async getPostPrerequisite(_id: ObjectId) {
+    //   If p.tag == empty:
+    // 	return allCourseMap
+    // return all CourseMap with CourseMap.tag intersect p > 0
   }
 
-  @Router.delete("/posts/:_id")
-  async deletePost(session: WebSessionDoc, _id: ObjectId) {
-    const user = WebSession.getUser(session);
-    await Post.isAuthor(user, _id);
-    return Post.delete(_id);
+  @Router.delete("/coursemap/:id")
+  async deleteLessonBook(session: WebSessionDoc, _id: ObjectId) {
+    //   If u == c.author:
+    // 	For all annotation a where a.item == c:
+    // 		Annotation[User, CourseMap].deleteAnnotaiton(a.id)
+    // Validation[User, CourseMap].delete(c)
+    // deleteCourseMap(c.id, u)
   }
 
-  @Router.get("/friends")
-  async getFriends(session: WebSessionDoc) {
-    const user = WebSession.getUser(session);
-    return await User.idsToUsernames(await Friend.getFriends(user));
+  @Router.put("/resume/:id/validate")
+  async validateResume(session: WebSessionDoc, _id: ObjectId) {
+    // 	resumes = set of all resumes with author = user and resume.field = res.field
+    // 	resumeRating = avg(resume.rating in resumes)
+    // userRate = resumeRating + weighted sum(Validation[User, Resume].netValidation(res))
+    // if userRate >= res.rating:
+    // 	Validation[User,Resume].validate(res, user)
   }
 
-  @Router.delete("/friends/:friend")
-  async removeFriend(session: WebSessionDoc, friend: string) {
-    const user = WebSession.getUser(session);
-    const friendId = (await User.getUserByUsername(friend))._id;
-    return await Friend.removeFriend(user, friendId);
+  @Router.put("/resume/:user/refute")
+  async refuteResume(session: WebSessionDoc, user: string) {
+    // 	resumes = set of all resumes with author = user and resume.field = res.field
+    // 	resumeRating = avg(resume.rating in resumes)
+    // userRate = resumeRating + weighted sum(Validation[User, Resume].netValidation(res))
+    // if userRate >= res.rating:
+    // 	Validation[User,Resume].refute(res, user)
   }
 
-  @Router.get("/friend/requests")
-  async getRequests(session: WebSessionDoc) {
-    const user = WebSession.getUser(session);
-    return await Responses.friendRequests(await Friend.getRequests(user));
+  @Router.put("/resume/:id/cancelVote")
+  async cancelVotes(session: WebSessionDoc, user: string) {
+    // 	resumes = set of all resumes with author = user and resume.field = res.field
+    // 	resumeRating = avg(resume.rating in resumes)
+    // userRate = resumeRating + weighted sum(Validation[User, Resume].netValidation(res))
+    // if userRate >= res.rating:
+    // 	Validation[User,Resume].validate(res, user)
   }
 
-  @Router.post("/friend/requests/:to")
-  async sendFriendRequest(session: WebSessionDoc, to: string) {
-    const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.sendRequest(user, toId);
+  @Router.get("/post/:_id/suggestValidators")
+  async suggestValidatorsForPost(_id: ObjectId) {
+    // 	resumes = set of all resumes with author = post.author and resume.field in post.tags
+    // resumeRating = avg(ratings of all resume in resumes)
+    // postRating = resumeRating +  weighted sum(Validation[User, ExclusivePost].netValidation(post))
+    // validUsers = set
+    // for all user in users:
+    // 	res = find resume where resume.field = field and author = user
+    // If res.rating +  weighted sum(Validation[User, Resume].netValidation(res))> postRating:
+    // 	addUser to validUsers
+    // Return validUsers
+  }
+  @Router.get("/validators/:threshold/:field")
+  async suggestValidators(threshold: Double, field: Set<string>) {}
+
+  @Router.get("/post/:_id")
+  async getPostCredentials(_id: ObjectId) {
+    // 	resumes = set of all resumes with author = user and resume.field in post.tags
+    // resumeRating = avg(ratings of all resume in resumes)
+    // return resumeRating + weighted sum(Validation[User,ExclusivePost].netValidation(post))
   }
 
-  @Router.delete("/friend/requests/:to")
-  async removeFriendRequest(session: WebSessionDoc, to: string) {
-    const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.removeRequest(user, toId);
+  @Router.get("/resume/:_id")
+  async getResumeCredentials(_id: ObjectId) {
+    // return res.rating + weighted sum(Validation[User, Resume].netValidation(res))
   }
 
-  @Router.put("/friend/accept/:from")
-  async acceptFriendRequest(session: WebSessionDoc, from: string) {
-    const user = WebSession.getUser(session);
-    const fromId = (await User.getUserByUsername(from))._id;
-    return await Friend.acceptRequest(fromId, user);
+  @Router.put("/posts/:id/validate")
+  async addValidationToPost(user: User, _id: ObjectId) {
+    // resumes = set of all resumes with author = user and resume.field in post.field
+    // 	resumeRae = avg(resume.rating in resumes)
+    // userRate = resumeRate +  weighted sum(Validation[User, Resume].netValidation(res))
+    // postRate =  resumeRate + weighted sum(Validation[User, ExclusivePost]. netValidation(post))
+    // 	if userRate >= postRate:
+    // Validation[User,ExclusivePost].validate(post, user)
   }
 
-  @Router.put("/friend/reject/:from")
-  async rejectFriendRequest(session: WebSessionDoc, from: string) {
-    const user = WebSession.getUser(session);
-    const fromId = (await User.getUserByUsername(from))._id;
-    return await Friend.rejectRequest(fromId, user);
+  @Router.put("/posts/:id/undoVote")
+  async removeValidationFromPost(user: User, _id: ObjectId) {
+    // resumes = set of all resumes with author = user and resume.field in post.field
+    // 	resumeRating = avg(resume.rating in resumes)
+    // userRate = resumeRating +  weighted sum(Validation[User, Resume].netValidation(res))
+    // postRating =  resumeRating + weighted sum(Validation[User, ExclusivePost]. netValidation(post))
+    // 	if userRate >= postRating:
+    // Validation[User,ExclusivePost].refute(post, user)
+    //
   }
 }
 
 export default getExpressRouter(new Routes());
+// TODO ANNOTATIONS
