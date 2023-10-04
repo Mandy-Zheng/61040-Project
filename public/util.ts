@@ -54,7 +54,7 @@ const operations: operation[] = [
     fields: { username: "input" },
   },
   {
-    name: "Create Exclusive Post",
+    name: "Create Exclusive Post (audience and tags are comma separated lists)",
     endpoint: "/api/exclusiveposts",
     method: "POST",
     fields: { title: "input", content: "input", audience: "input", tags: "input" },
@@ -66,7 +66,7 @@ const operations: operation[] = [
     fields: { username: "input" },
   },
   {
-    name: "Update Post Audience",
+    name: "Update Post Audience (usernames separated by commas)",
     endpoint: "/api/exclusiveposts/:id",
     method: "PATCH",
     fields: { id: "input", audience: "input" },
@@ -78,7 +78,7 @@ const operations: operation[] = [
     fields: { id: "input" },
   },
   {
-    name: "Create Resume",
+    name: "Create Resume (work and school are comma separated lists)",
     endpoint: "/api/resume",
     method: "POST",
     fields: { name: "input", field: "input", work: "input", school: "input" },
@@ -90,7 +90,7 @@ const operations: operation[] = [
     fields: { username: "input" },
   },
   {
-    name: "Update Resume",
+    name: "Update Resume (work and school are comma separated lists)",
     endpoint: "/api/resume/:id",
     method: "PATCH",
     fields: { id: "input", update: { name: "input", field: "input", work: "input", school: "input" } },

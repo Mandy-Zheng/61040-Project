@@ -57,8 +57,8 @@ export default class ResumeConcept {
   }
 
   async delete(_id: ObjectId, author: ObjectId) {
-    return await this.isAuthor(_id, author);
-    // await this.resumes.deleteOne({ _id });
-    // return { msg: "Resume successfully deleted!" };
+    await this.isAuthor(_id, author);
+    await this.resumes.deleteOne({ _id });
+    return { msg: "Resume successfully deleted!" };
   }
 }
