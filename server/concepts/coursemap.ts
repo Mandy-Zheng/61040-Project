@@ -3,7 +3,7 @@ import DocCollection, { BaseDoc } from "../framework/doc";
 import { NotAllowedError, UnauthenticatedError } from "./errors";
 
 export interface CourseMapDoc extends BaseDoc {
-  items: Map<ObjectId, number>;
+  items: Map<ObjectId, Array<ObjectId>>;
   author: ObjectId;
   tags: string;
 }
@@ -11,7 +11,7 @@ export interface CourseMapDoc extends BaseDoc {
 export default class CourseMapConcept {
   public readonly coursemaps = new DocCollection<CourseMapDoc>("resumes");
 
-  async create(author: ObjectId, items: Map<ObjectId, number>, tags: string) {
+  async create(author: ObjectId, items: Map<ObjectId, Array<ObjectId>>, tags: string) {
     await this.coursemaps.createOne({ author, items, tags });
     return { msg: "Course Map Created Successfully!" };
   }
@@ -23,7 +23,7 @@ export default class CourseMapConcept {
     }
   }
 
-  //   async getCourseMapByTags(tags: Set<String>) {
+  //   async getCourseMapByTags(tags: Array<String>) {
   //     // pass
   //   }
 
