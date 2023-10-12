@@ -10,9 +10,7 @@ import { UserDoc } from "./concepts/user";
 import { ValidationDoc } from "./concepts/validation";
 import { WebSessionDoc } from "./concepts/websession";
 
-//TODO: DELETE EVERYTHING, RATING FOR POSTS
-
-// helper function
+// helper function that calculates rating based on an inital rating and how many people approved or disapproved the item
 const calculateRating = (baseRating: number, validation: ValidationDoc) => {
   return Math.max(0, baseRating + 0.1 * (validation.haveValidated.length - validation.haveRefuted.length));
 };
@@ -46,6 +44,12 @@ class Routes {
     return await User.update(user, update);
   }
 
+  /**
+   *
+   * @param session session
+   * @returns deletes posts, resumes, annotations, and maps made by the user in session and deletes user from any approvals or disapprovals as well as audience of posts
+   *
+   */
   @Router.delete("/users")
   async deleteUser(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
@@ -65,9 +69,10 @@ class Routes {
     const validationsPost = await ValidationPost.getValidationByObjectId();
     const validationsMap = await ValidationMap.getValidationByObjectId();
     const userIdString = user.toString();
-    await Promise.all(validationsResume.map((validation) => ValidationResume.undoVote(validation._id.toString(), userIdString)));
-    await Promise.all(validationsPost.map((validation) => ValidationResume.undoVote(validation._id.toString(), userIdString)));
-    await Promise.all(validationsMap.map((validation) => ValidationResume.undoVote(validation._id.toString(), userIdString)));
+    await Promise.all(validationsResume.map((validation) => ValidationResume.undoVote(validation.objectId, userIdString)));
+    await Promise.all(validationsPost.map((validation) => ValidationPost.undoVote(validation.objectId, userIdString)));
+    await Promise.all(validationsMap.map((validation) => ValidationMap.undoVote(validation.objectId, userIdString)));
+    await ExclusivePost.deleteFromAudience(userIdString);
     return await User.delete(user);
   }
 
@@ -86,7 +91,15 @@ class Routes {
 
   // RESUME[User]
 
-  // create resume
+  /**
+   *
+   * @param session session
+   * @param name a name (no quotes) e.g. Amanda
+   * @param work Array of strings e.g. ["urop", "lab"]
+   * @param school Array of strings e.g. ["MIT", "Harvard"]
+   * @param field a field (no quotes) e.g. biology
+   * @returns creates credentials with name, list of work credentials, list of past schools related to a field
+   */
   @Router.post("/resume")
   async createResume(session: WebSessionDoc, name: string, work: Array<string>, school: Array<string>, field: string) {
     const user = WebSession.getUser(session);
@@ -102,7 +115,6 @@ class Routes {
     return resume;
   }
 
-  //get all resume
   @Router.get("/resume")
   async getResume(session: WebSessionDoc) {
     WebSession.getUser(session);
@@ -113,7 +125,12 @@ class Routes {
     });
   }
 
-  //get resumes for a certain user
+  /**
+   *
+   * @param session session
+   * @param username someones username (no quotes) e.g. Amanda
+   * @returns resumes created by the user with username username
+   */
   @Router.get("/resume/:username")
   async getResumeByUser(session: WebSessionDoc, username: string) {
     WebSession.getUser(session);
@@ -125,14 +142,28 @@ class Routes {
     });
   }
 
-  //update resume
+  /**
+   *
+   * @param session session
+   * @param id id of a resume e.g. 652724ee4b6d1aec45545d0a
+   * @param update.name a name (no quotes) e.g. Amanda
+   * @param update.field a field (no quotes) e.g. biology
+   * @param update.work Array of strings e.g. ["urop", "lab"]
+   * @param update.school Array of strings e.g. ["MIT", "Harvard"]
+   * @returns update resume with id id
+   */
   @Router.patch("/resume")
   async updateResume(session: WebSessionDoc, id: ObjectId, update: Partial<ResumeDoc>) {
     const user = WebSession.getUser(session);
     return await Resume.update(id, user, update);
   }
 
-  // delete a resume
+  /**
+   *
+   * @param session session
+   * @param id id of a resume e.g. 652724ee4b6d1aec45545d0a
+   * @returns deletes resume with corresponding id if user in session is the author of the resume
+   */
   @Router.delete("/resume/:id")
   async deleteResume(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -141,7 +172,13 @@ class Routes {
     return msg;
   }
 
-  //get validators based on with resume ratings higher than inputed threshold and field in fields
+  /**
+   *
+   * @param session session
+   * @param fielda field (no quotes) e.g. biology
+   * @param minimumRating number e.g 3.4
+   * @returns get users with their resumes if their resume ratings are higher than minimumRating and field is field
+   */
   @Router.get("/resume/experts/:field/:minimumRating")
   async getExperts(session: WebSessionDoc, field: string, minimumRating: number) {
     WebSession.getUser(session);
@@ -160,7 +197,12 @@ class Routes {
 
   // Validation[User, Resume]
 
-  //rating
+  /**
+   *
+   * @param session session
+   * @param id id of a resume e.g. 652724ee4b6d1aec45545d0a
+   * @returns show rating of resume and users that approved and dissaproved it
+   */
   @Router.get("/validation/resume/:id")
   async getResumeValidationsById(session: WebSessionDoc, id: ObjectId) {
     WebSession.getUser(session);
@@ -171,6 +213,12 @@ class Routes {
     return { rating: calculateRating(resume.initialRating, validation), resume: resume, approvals: approvals, disapprovals: disapprovals };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a resume e.g. 652724ee4b6d1aec45545d0a
+   * @returns approve resume with id id
+   */
   @Router.patch("/validation/approval/resume/:id")
   async validateResume(session: WebSessionDoc, id: string) {
     const user = WebSession.getUser(session);
@@ -178,6 +226,12 @@ class Routes {
     return { msg: `Successfully approved resume ${id}` };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id  id of a resume e.g. 652724ee4b6d1aec45545d0a
+   * @returns disapprove resume with id id
+   */
   @Router.patch("/validation/disapproval/resume/:id")
   async refuteResume(session: WebSessionDoc, id: string) {
     const user = WebSession.getUser(session);
@@ -185,6 +239,12 @@ class Routes {
     return { msg: `Successfully disapproved resume ${id}` };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a resume e.g. 652724ee4b6d1aec45545d0a
+   * @returns undo the approval or disapproval on resume with id id
+   */
   @Router.patch("/validation/undoValidation/resume/:id")
   async undoVoteResume(session: WebSessionDoc, id: string) {
     const user = WebSession.getUser(session);
@@ -192,8 +252,17 @@ class Routes {
     return { msg: `Cancelled vote on resume ${id}` };
   }
 
-  // EXCLUSIVE POST[User]
+  // EXCLUSIVEPOST[User]
 
+  /**
+   *
+   * @param session session
+   * @param title title of post e.g. Happiness
+   * @param content content of post e.g Life is good
+   * @param audience Array of strings of usernames e.g. ["Amanda", "Flora"]
+   * @param tags Array of strings (subjects of post) e.g. ["life", "biology"]
+   * @returns creates a post with title = title, content = content, audience = audience, and tags = tags
+   */
   @Router.post("/exclusivepost")
   async createPost(session: WebSessionDoc, title: string, content: string, audience: Array<string>, tags: Array<string>) {
     const user = WebSession.getUser(session);
@@ -210,7 +279,11 @@ class Routes {
     return post;
   }
 
-  //get posts that are viewable by user
+  /**
+   *
+   * @param session session
+   * @returns gets all posts that the user in session can view
+   */
   @Router.get("/exclusivepost")
   async getViewablePosts(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
@@ -232,7 +305,12 @@ class Routes {
     });
   }
 
-  //get posts that are viewable by id
+  /**
+   *
+   * @param session session
+   * @param id id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns post if the user is allowed to view the post with id id
+   */
   @Router.get("/exclusivepost/:id")
   async getViewablePostById(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -245,6 +323,12 @@ class Routes {
     return { author: author.username, rating: calculateRating(averageRating, validation), post: post };
   }
 
+  /**
+   *
+   * @param session session
+   * @param username someones username (no quotes) e.g. Amanda
+   * @returns all posts written by user with username username
+   */
   //get posts viewable by user and written by specific author
   @Router.get("/exclusivepost/author/:username")
   async getViewablePostsByAuthor(session: WebSessionDoc, username: string) {
@@ -266,7 +350,12 @@ class Routes {
     };
   }
 
-  // delete post
+  /**
+   *
+   * @param session session
+   * @param id id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns deletes post with corresponding id if user in session is the author of the post
+   */
   @Router.delete("/exclusivepost/:id")
   async deletePost(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -277,6 +366,12 @@ class Routes {
 
   // Validation[User, ExclusivePost]
 
+  /**
+   *
+   * @param session session
+   * @param id  id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns show rating of post and users that approved and dissaproved it, if it is viewable to user in session
+   */
   @Router.get("/validation/exclusivepost/:id")
   async getPostValidationsById(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -291,7 +386,12 @@ class Routes {
     return { author: author.username, rating: calculateRating(averageRating, validation), post: post, approvals: approvals, disapprovals: disapprovals };
   }
 
-  //get validators based on with resume ratings higher than inputed threshold and field in fields
+  /**
+   *
+   * @param session session
+   * @param id id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns shows the credentials of the approvers of the post with id id, if it is viewable to user in session
+   */
   @Router.get("/validation/approval/exclusivepost/:id")
   async showPostApproverCredentials(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -314,6 +414,12 @@ class Routes {
     return showValidatorCredentials;
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns shows the credentials of the disapprovers of the post with id id, if it is viewable to user in session
+   */
   @Router.get("/validation/disapproval/exclusivepost/:id")
   async showPostDisapproverCredentials(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -336,6 +442,12 @@ class Routes {
     return showValidatorCredentials;
   }
 
+  /**
+   *
+   * @param session session
+   * @param id  id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns approve post with id id is user in session has access to post
+   */
   @Router.patch("/validation/approval/exclusivepost/:id")
   async validatePost(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -344,6 +456,12 @@ class Routes {
     return { msg: `Successfully approved post ${id}` };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id  id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns disapprove post with id id is user in session has access to post
+   */
   @Router.patch("/validation/disapproval/exclusivepost/:id")
   async refutePost(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -352,6 +470,12 @@ class Routes {
     return { msg: `Successfully disapproved post ${id}` };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id  id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns undo the approval or disapproval on post with id id is user in session has access to post
+   */
   @Router.patch("/validation/undoValidation/exclusivepost/:id")
   async undoVotePost(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -362,18 +486,33 @@ class Routes {
 
   // ANNOTATION[ExclusivePost, User]
 
-  //make an annotation on post
+  /**
+   *
+   * @param session session
+   * @param postId id of the post to annotate e.g. 652724ee4b6d1aec45545d0a
+   * @param comment annotation comment of post e.g. This is really cool
+   * @param quote a substring of the content of the post with id postId e.g. "Life is"
+   * @returns creates an annotation on post with postId at the specified quote with comment comment if user in session has acces to post
+   */
   @Router.post("/annotation/exclusivepost")
   async createAnnotation(session: WebSessionDoc, postId: ObjectId, comment: string, quote: string) {
+    if (!postId) {
+      throw new BadValuesError("Must provide a post id to annotate");
+    }
     const user = WebSession.getUser(session);
     const post = await ExclusivePost.getById(postId, user);
-    if (post.content.indexOf(quote)) {
+    if (post.content.indexOf(quote) === -1) {
       throw new NotFoundError("Quote not found in Post");
     }
     return await Annotation.create(postId, user, comment, quote);
   }
 
-  //get annotations of a post sorted by time stamp
+  /**
+   *
+   * @param session session
+   * @param postId id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns displays all annotations on a post with id postId, sorted by the time the annotaitons were updated if user in session has access to post
+   */
   @Router.get("/annotation/exclusivepost/:postId")
   async getPostAnnotationsSorted(session: WebSessionDoc, postId: ObjectId) {
     const user = WebSession.getUser(session);
@@ -381,7 +520,11 @@ class Routes {
     return await Annotation.sortedAnnotations(postId);
   }
 
-  //get annotations by logged in user
+  /**
+   *
+   * @param session session
+   * @returns all annotations made by user in session
+   */
   @Router.get("/annotation/myAnnotations")
   async getMyAnnotations(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
@@ -389,7 +532,14 @@ class Routes {
     return notes;
   }
 
-  //update an annotation
+  /**
+   *
+   * @param session session
+   * @param id id of a annotation to edit e.g. 652724ee4b6d1aec45545d0a
+   * @param update.comment annotation comment of post e.g. This is really cool
+   * @param update.quote a substring of the content of the post with id postId e.g. "Life is"
+   * @returns updates an existing annotation with id id if user in session is the author
+   */
   @Router.patch("/annotation")
   async updateAnnotation(session: WebSessionDoc, id: ObjectId, update: Partial<AnnotationDoc>) {
     const user = WebSession.getUser(session);
@@ -401,14 +551,25 @@ class Routes {
     return await Annotation.update(id, user, update);
   }
 
-  //delete an annotation
+  /**
+   *
+   * @param session session
+   * @param id id of an annotation e.g. 652724ee4b6d1aec45545d0a
+   * @returns deletes annotation with id id if user in session is the author of the annotation
+   */
   @Router.delete("/annotation/:id")
   async deleteAnnotation(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
     return await Annotation.delete(id, user);
   }
 
-  @Router.get("/annotation/:top")
+  /**
+   *
+   * @param session session
+   * @param top an integer > 0 e.g. 2
+   * @returns shows the top number of users with the most annotations
+   */
+  @Router.get("/annotation/topReviewers/:top")
   async suggestMostActiveReviewers(session: WebSessionDoc, top: number) {
     WebSession.getUser(session);
     const num = Number(top);
@@ -430,6 +591,14 @@ class Routes {
 
   // Dependency Map[User, ExclusivePost]
 
+  /**
+   *
+   * @param session session
+   * @param deps A json of key value pairs where keys are posts ids (prerequistes) and values are an Array of post ids (post requisites) e.g. {"652725144b6d1aec45545d0b": ["652724ee4b6d1aec45545d0a"], "652724ee4b6d1aec45545d0a": ["652725144b6d1aec45545d0c, 652725144b6d1aec45545d0d"]}
+   * @param tags  Array of strings (subjects of post) e.g. ["life", "biology"]
+   * @param title title of dependency map
+   * @returns a dependency map of posts where some posts are prerequisits of post
+   */
   @Router.post("/depmap")
   async createMap(session: WebSessionDoc, deps: Record<string, Array<string>>, tags: Array<string>, title: string) {
     const user = WebSession.getUser(session);
@@ -457,15 +626,38 @@ class Routes {
   @Router.get("/depmap")
   async getAllMap(session: WebSessionDoc) {
     WebSession.getUser(session);
-    return await DepMap.getMapById();
+    const maps = await DepMap.getMapById();
+    const authors = await User.idsToUsernames(maps.map((map) => new ObjectId(map.author)));
+    return maps.map((map, idx) => {
+      return { author: authors[idx], map: map };
+    });
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a dependency map e.g. 652724ee4b6d1aec45545d0a
+   * @returns dependency map with id id
+   */
   @Router.get("/depmap/:id")
   async getMapById(session: WebSessionDoc, id: ObjectId) {
     WebSession.getUser(session);
-    return await DepMap.getMapById(id);
+    const map = await DepMap.getMapById(id);
+    const authors = await User.idsToUsernames(map.map((m) => new ObjectId(m.author)));
+    return map.map((m, idx) => {
+      return { author: authors[idx], map: m };
+    });
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a dependency map e.g. 652724ee4b6d1aec45545d0a
+   * @param update.deps A json of key value pairs where keys are posts ids (prerequistes) and values are an Array of post ids (post requisites) e.g. {"652725144b6d1aec45545d0b": ["652724ee4b6d1aec45545d0a"], "652724ee4b6d1aec45545d0a": ["652725144b6d1aec45545d0c, 652725144b6d1aec45545d0d"]}
+   * @param update.tags  Array of strings (subjects of post) e.g. ["life", "biology"]
+   * @param update.title  title of dependency map
+   * @returns updates the dependency map with id id
+   */
   @Router.patch("/depmap")
   async updateMap(session: WebSessionDoc, id: ObjectId, update: Partial<DependencyMapDoc>) {
     const user = WebSession.getUser(session);
@@ -489,6 +681,12 @@ class Routes {
     }
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a dependency map e.g. 652724ee4b6d1aec45545d0a
+   * @returns deletes dependency map with corresponding id if user in session is the author of the map
+   */
   @Router.delete("/depmap/:id")
   async deleteMap(session: WebSessionDoc, id: ObjectId) {
     const user = WebSession.getUser(session);
@@ -497,11 +695,18 @@ class Routes {
     return msg;
   }
 
-  //map and
-  // get Depmap where the post is an item in the Depmap
+  /**
+   *
+   * @param session session
+   * @param postId id of a post e.g. 652724ee4b6d1aec45545d0a
+   * @returns all dependency maps where the postId is a postrequisite in the map
+   */
   @Router.get("/depmap/postprerequisite/:postId")
   async getPrerequisiteForPost(session: WebSessionDoc, postId: ObjectId) {
     const user = WebSession.getUser(session);
+    if (!postId) {
+      throw new BadValuesError("Please provide a post id");
+    }
     await ExclusivePost.getById(postId, user);
     const maps = await DepMap.getMapById();
     const prerequisite = maps.filter((map) => {
@@ -511,7 +716,11 @@ class Routes {
     return prerequisite;
   }
 
-  // gets maps where every single post is viewable to user
+  /**
+   *
+   * @param session session
+   * @returns all maps where every post in map is viewable by user in session
+   */
   @Router.get("/users/depmap/viewableMaps")
   async getFullyViewableMaps(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
@@ -533,7 +742,11 @@ class Routes {
     return viewableMap;
   }
 
-  //get most popular Depmaps
+  /**
+   *
+   * @param session session
+   * @returns returns all dependency maps sorted by number of approvals and disapprovals
+   */
   @Router.get("/validation/depmap/popular")
   async getPopularDepMap(session: WebSessionDoc) {
     WebSession.getUser(session);
@@ -549,7 +762,13 @@ class Routes {
     return validationWithTitles;
   }
 
-  @Router.get("/depmap/topics/:topic")
+  /**
+   *
+   * @param session session
+   * @param topic a topic (no quotes) e.g. biology
+   * @returns all dependency maps with topic in their tags
+   */
+  @Router.get("/depmap/search/topics/:topic")
   async getMapsByTopics(session: WebSessionDoc, topic: string) {
     WebSession.getUser(session);
     const maps = await DepMap.getMapById();
@@ -562,6 +781,11 @@ class Routes {
 
   // Validation[User, DependencyMap]
 
+  /**
+   *
+   * @param session session
+   * @returns get all dependency maps with information about users that approved or disapporved it
+   */
   @Router.get("/validation/depmap")
   async getAllDepMapValidations(session: WebSessionDoc) {
     WebSession.getUser(session);
@@ -576,6 +800,13 @@ class Routes {
       return { author: authors[idx], map: map, approvals: approvals[idx], disapprovals: disapprovals[idx] };
     });
   }
+
+  /**
+   *
+   * @param session session
+   * @param id id of a dependency map e.g. 652724ee4b6d1aec45545d0a
+   * @returns get dependency maps with id id with information about users that approved or disapporved it
+   */
   @Router.get("/validation/depmap/:id")
   async getDepMapValidationsById(session: WebSessionDoc, id: ObjectId) {
     WebSession.getUser(session);
@@ -587,6 +818,12 @@ class Routes {
     return { author: user.username, map: map, approvals: approvals, disapprovals: disapprovals };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a dependency map e.g. 652724ee4b6d1aec45545d0a
+   * @returns approve dependency map with id id
+   */
   @Router.patch("/validation/approval/depmap/:id")
   async validateDepMap(session: WebSessionDoc, id: string) {
     const user = WebSession.getUser(session);
@@ -594,6 +831,12 @@ class Routes {
     return { msg: `Successfully approved map ${id}` };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id  id of a dependencymap e.g. 652724ee4b6d1aec45545d0a
+   * @returns disapprove dependencymap with id id
+   */
   @Router.patch("/validation/disapproval/depmap/:id")
   async refuteDepMap(session: WebSessionDoc, id: string) {
     const user = WebSession.getUser(session);
@@ -601,6 +844,12 @@ class Routes {
     return { msg: `Successfully disapproved map ${id}` };
   }
 
+  /**
+   *
+   * @param session session
+   * @param id id of a dependency map e.g. 652724ee4b6d1aec45545d0a
+   * @returns undo the approval or disapproval on dependency map with id id
+   */
   @Router.patch("/validation/undoValidation/depmap/:id")
   async undoVoteDepMap(session: WebSessionDoc, id: string) {
     const user = WebSession.getUser(session);

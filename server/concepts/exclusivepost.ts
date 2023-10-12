@@ -60,6 +60,13 @@ export default class ExclusivePostConcept {
     return allPosts.filter((post) => post.audience.includes(viewer.toString()));
   }
 
+  async deleteFromAudience(viewer: string) {
+    const posts = await this.exclusiveposts.readMany({ audience: viewer });
+    const newAudiences = posts.map((post) => post.audience.filter((user) => user !== viewer));
+    posts.map((post, idx) => this.exclusiveposts.updateOne({ _id: post._id }, { audience: newAudiences[idx] }));
+    return { msg: "Removed from audience successfully!" };
+  }
+
   async delete(_id: ObjectId, author: ObjectId) {
     await this.isAuthor(_id, author);
     await this.exclusiveposts.deleteOne({ _id });

@@ -44,7 +44,7 @@ export default class AnnotationConcept {
   }
   async sortedAnnotations(original: ObjectId) {
     const notes = await this.annotations.readMany({ original });
-    return notes.sort((a, b) => a.dateUpdated.getTime() - b.dateUpdated.getTime());
+    return notes.sort((a, b) => b.dateUpdated.getTime() - a.dateUpdated.getTime());
   }
 
   async update(_id: ObjectId, author: ObjectId, update: Partial<AnnotationDoc>) {

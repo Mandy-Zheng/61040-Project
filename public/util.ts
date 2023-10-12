@@ -84,7 +84,7 @@ const operations: operation[] = [
     name: "Get Experts by Field and Rating",
     endpoint: "/api/resume/experts/:field/:minimumRating",
     method: "GET",
-    fields: { field: "input", minimumRating: "input" }, //TODO
+    fields: { field: "input", minimumRating: "input" },
   },
 
   // Validation (Resume)
@@ -209,9 +209,9 @@ const operations: operation[] = [
   },
   {
     name: "Get Top N Reviewers",
-    endpoint: "/api/annotation/:top",
+    endpoint: "/api/annotation/topReviewers/:top",
     method: "GET",
-    fields: { top: "input" }, //TODO CHECK NUMBER
+    fields: { top: "input" },
   },
 
   // Dependency Map
@@ -245,7 +245,6 @@ const operations: operation[] = [
     method: "GET",
     fields: { postId: "input" },
   },
-  //========================
   {
     name: "Get Fully Viewable Dependency Maps",
     endpoint: "/api/users/depmap/viewableMaps",
@@ -260,7 +259,7 @@ const operations: operation[] = [
   },
   {
     name: "Get Maps By Topic",
-    endpoint: "/api/depmap/topics/:topic",
+    endpoint: "/api/depmap/search/topics/:topic",
     method: "GET",
     fields: { topic: "input" },
   },
