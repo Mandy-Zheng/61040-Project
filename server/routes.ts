@@ -261,7 +261,7 @@ class Routes {
    * @param content content of post e.g Life is good
    * @param audience Array of strings of usernames e.g. ["Amanda", "Flora"]
    * @param tags Array of strings (subjects of post) e.g. ["life", "biology"]
-   * @returns creates a post with title = title, content = content, audience = audience, and tags = tags
+   * @returns creates a post with title = title, content = content, audience = audience + user in session, and tags = tags
    */
   @Router.post("/exclusivepost")
   async createPost(session: WebSessionDoc, title: string, content: string, audience: Array<string>, tags: Array<string>) {
