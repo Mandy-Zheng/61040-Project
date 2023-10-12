@@ -515,6 +515,9 @@ class Routes {
    */
   @Router.get("/annotation/exclusivepost/:postId")
   async getPostAnnotationsSorted(session: WebSessionDoc, postId: ObjectId) {
+    if (!postId) {
+      throw new BadValuesError("Please provide a post id");
+    }
     const user = WebSession.getUser(session);
     await ExclusivePost.getById(postId, user);
     return await Annotation.sortedAnnotations(postId);
